@@ -1,3 +1,6 @@
 [submodule "embassy"]
 	path = embassy
 	url = git@github.com:embassy-rs/embassy.git
+[submodule "rust-mavlink"]
+	path = rust-mavlink
+	url = git@github.com:mavlink/rust-mavlink.git

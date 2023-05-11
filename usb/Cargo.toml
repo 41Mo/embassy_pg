@@ -11,6 +11,7 @@ embassy-stm32 = { version = "0.1.0", path="../embassy/embassy-stm32", features =
 embassy-sync = { version = "0.2.0", path="../embassy/embassy-sync", features = ["defmt"]}
 embassy-usb = { version = "0.1.0", path="../embassy/embassy-usb", features = ["defmt"]}
 embassy-time = { version = "0.1.0", path = "../embassy/embassy-time", features = ["defmt", "defmt-timestamp-uptime", "unstable-traits", "tick-hz-32_768"] }
+embassy-futures = { version = "0.1.0", path = "../embassy/embassy-futures", features = ["defmt"] }
 
 defmt = "0.3"
 defmt-rtt = "0.4"
@@ -23,12 +24,14 @@ heapless = { version = "0.7.5", default-features = false }
 # embedded-hal = "0.2.6"
 # embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.10" }
 embedded-hal-async = { version = "0.2.0-alpha.1" }
+mavlink = {version = "0.11.2", path = "../rust-mavlink", default-features = false, features = ["common", "embedded"]}
 # embedded-nal-async = "0.4.0"
 # rand_core = "0.6.3"
 # critical-section = "1.1"
 # micromath = "2.0.0"
 # stm32-fmc = "0.2.4"
 # embedded-storage = "0.3.0"
+# ringbuf = { version = "0.3.3", default-features = false }
 
 # cargo build/run
 [profile.dev]
@@ -48,3 +51,11 @@ incremental = false
 lto = 'fat'
 opt-level = 3 # <-
 overflow-checks = false # <-
+
+[[bin]]
+name = "usb_test"
+path = "src/main.rs"
+test = false
+bench = false
+
+

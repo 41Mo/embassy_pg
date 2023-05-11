@@ -2,30 +2,29 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+mod usb;
+
 use cortex_m_rt::entry;
-use defmt::{panic, *};
-use embassy_executor::{Executor, Spawner};
+use defmt::{debug, info, unwrap};
+use embassy_executor::Executor;
 use embassy_stm32::peripherals::USB_OTG_FS;
 use embassy_stm32::time::mhz;
-use embassy_stm32::usb_otg::{Driver, Instance};
+use embassy_stm32::usb_otg::Driver;
 use embassy_stm32::{self, interrupt, Config};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
-use embassy_time::{with_timeout, Duration, Timer};
-use embassy_usb::class::cdc_acm::{CdcAcmClass, Receiver, Sender, State};
-use embassy_usb::driver::EndpointError;
-use embassy_usb::{Builder, UsbDevice};
-use embedded_hal_async as eha;
-use futures::future::{join, select, Either};
-use futures::{join, pin_mut, select_biased, stream, FutureExt};
+use embassy_time::{Duration, Timer, Instant};
+use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
+use embassy_usb::Builder;
+use embassy_futures::join::join;
+use mavlink;
+use mavlink::common as mav_common;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
-static EXECUTOR: StaticCell<Executor> = StaticCell::new();
-static SIGNAL: Signal<CriticalSectionRawMutex, usize> = Signal::new();
-static SIGNAL_USB_RESET: Signal<CriticalSectionRawMutex, bool> = Signal::new();
+use crate::usb::{usb_task, Console};
 
-type MyDriver = Driver<'static, USB_OTG_FS>;
+static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
 macro_rules! singleton {
     ($val:expr) => {{
@@ -36,144 +35,60 @@ macro_rules! singleton {
     }};
 }
 
-struct SerialConsole<D, R, S> {
-    device: D,
-    rx: R,
-    tx: S,
-}
+pub type UsbDriver = Driver<'static, USB_OTG_FS>;
 
-enum UsbTaskStates {
-    Suspended,
-    NeedReset,
-}
+static MAV_HEADER: mavlink::MavHeader = mavlink::MavHeader {
+    system_id: 1,
+    component_id: 1,
+    sequence: 0,
+};
 
-type Console = SerialConsole<
-    UsbDevice<'static, Driver<'static, USB_OTG_FS>>,
-    Receiver<'static, Driver<'static, USB_OTG_FS>>,
-    Sender<'static, Driver<'static, USB_OTG_FS>>,
->;
-
-
-impl Console {
-    async fn poll(mut device: UsbDevice<'static, Driver<'static, USB_OTG_FS>>) {
-        loop {
-            let run_status = {
-                let usb_run_fut = device.run_until_suspend();
-                let usb_reset_fut = SIGNAL_USB_RESET.wait();
-                pin_mut!(usb_run_fut);
-                pin_mut!(usb_reset_fut);
-                debug!("run until suspend!");
-
-                match select(usb_run_fut, usb_reset_fut).await {
-                    Either::Left(_) => {
-                        debug!("suspended!");
-                        UsbTaskStates::Suspended
-                    }
-                    Either::Right(_) => {
-                        debug!("need reset!");
-                        UsbTaskStates::NeedReset
-                    }
-                }
-            };
-            match run_status {
-                UsbTaskStates::Suspended => {
-                    debug!("waiting resume");
-                    device.wait_resume().await;
-                    debug!("usb resumed")
-                }
-                UsbTaskStates::NeedReset => {
-                    device.disable().await;
-                    debug!("usb disabled")
-                }
-            };
-        }
-    }
-
-    async fn rx(mut rx: Receiver<'static, Driver<'static, USB_OTG_FS>>) {
-        let mut buf = [0u8; 256];
-        loop {
-            rx.wait_connection().await;
-            let res = with_timeout(Duration::from_millis(10), rx.read_packet(&mut buf)).await;
-            match res {
-                Ok(rx_res) => {
-                    match rx_res {
-                        Ok(_) => (),
-                        Err(e) => {
-                            info!("rx err: {}", e);
-                        }
-                    };
-                }
-                Err(e) => {
-                    // info!("usb rx timeout: {}", e);
-                }
-            }
-        }
-    }
-
-    async fn tx(mut tx: Sender<'static, Driver<'static, USB_OTG_FS>>) {
-        // let buf: [u8; 200] = array_init::from_iter(iter).unwrap();
-        const buf_size: usize = 256;
-        let mut buf: [u8; buf_size] = [0u8; buf_size];
-        for i in 0..buf_size {
-            buf[i] = i as u8;
-        }
-        loop {
-            tx.wait_connection().await;
-            SIGNAL.wait().await;
-            let mut start = 0;
-            for i in (64..buf_size + 1).step_by(64) {
-                let res =
-                    with_timeout(Duration::from_millis(100), tx.write_packet(&buf[start..i])).await;
-                match res {
-                    Ok(tx_res) => {
-                        match tx_res {
-                            Ok(_) => start = i,
-                            Err(e) => {
-                                debug!("tx err: {}", e);
-                                match e {
-                                    EndpointError::BufferOverflow => {
-                                        Timer::after(Duration::from_secs(5)).await
-                                    }
-                                    EndpointError::Disabled => tx.wait_connection().await,
-                                };
-                            }
-                        };
-                    }
-                    Err(e) => {
-                        debug!("usb tx timeout: {}", e);
-                        /*
-                         * FIXME unnessesary reset on tx timout. But if i dont do this, usb stack
-                         * cant reach succesfull setup state
-                         */
-                        SIGNAL_USB_RESET.signal(true);
-                        Timer::after(Duration::from_secs(5)).await;
-                        break;
-                    }
-                }
-            }
-        }
+async fn send_heartbeat() {
+    loop {
+        Timer::after(Duration::from_secs(1)).await;
+        let mut msg = mavlink::MAVLinkV2MessageRaw::new();
+        msg.serialize_message(
+            MAV_HEADER,
+            &mut mav_common::MavMessage::HEARTBEAT(mav_common::HEARTBEAT_DATA {
+                custom_mode: 0,
+                mavtype: mavlink::common::MavType::MAV_TYPE_FIXED_WING,
+                autopilot: mavlink::common::MavAutopilot::MAV_AUTOPILOT_GENERIC,
+                base_mode: mavlink::common::MavModeFlag::empty(),
+                system_status: mavlink::common::MavState::MAV_STATE_ACTIVE,
+                mavlink_version: 0x3,
+            }),
+        );
+        usb::console_print(msg.as_bytes()).await;
     }
 }
 
-#[embassy_executor::task]
-async fn usb_task(c: Console) {
-    let tx_fut = Console::tx(c.tx);
-    let rx_fut = Console::rx(c.rx);
-    let run_fut = Console::poll(c.device);
-    join!(run_fut, tx_fut, rx_fut);
+async fn send_scaled_imu() -> ! {
+    loop {
+        Timer::after(Duration::from_hz(10)).await;
+        let mut msg = mavlink::MAVLinkV2MessageRaw::new();
+        msg.serialize_message(
+            MAV_HEADER,
+            &mut mav_common::MavMessage::SCALED_IMU(mav_common::SCALED_IMU_DATA {
+                time_boot_ms: Instant::now().as_millis() as u32,
+                xacc: 0,
+                yacc: 0,
+                zacc: 9810,
+                xgyro: 0,
+                ygyro: 0,
+                zgyro: 0,
+                xmag: 0,
+                ymag: 0,
+                zmag: 0,
+            }),
+        );
+        usb::console_print(msg.as_bytes()).await;
+    }
 }
 
 #[embassy_executor::task]
 async fn sending_task() {
-    let mut counter: usize = 0;
-
-    loop {
-        Timer::after(Duration::from_millis(2)).await;
-
-        SIGNAL.signal(counter);
-
-        counter = counter.wrapping_add(1);
-    }
+    // join(send_heartbeat(), send_scaled_imu()).await;
+    send_scaled_imu().await;
 }
 
 #[entry]
