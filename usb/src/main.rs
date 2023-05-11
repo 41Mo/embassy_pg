@@ -11,8 +11,6 @@ use embassy_stm32::peripherals::USB_OTG_FS;
 use embassy_stm32::time::mhz;
 use embassy_stm32::usb_otg::Driver;
 use embassy_stm32::{self, interrupt, Config};
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::signal::Signal;
 use embassy_time::{Duration, Timer, Instant};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::Builder;
@@ -87,8 +85,7 @@ async fn send_scaled_imu() -> ! {
 
 #[embassy_executor::task]
 async fn sending_task() {
-    // join(send_heartbeat(), send_scaled_imu()).await;
-    send_scaled_imu().await;
+    join(send_heartbeat(), send_scaled_imu()).await;
 }
 
 #[entry]
