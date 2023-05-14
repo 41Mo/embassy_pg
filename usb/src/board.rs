@@ -31,10 +31,10 @@ fn init_periph() -> Peripherals {
     config.rcc.sys_ck = Some(SYS_CK);
     config.rcc.hclk = Some(HCLK);
     config.rcc.pll1.q_ck = Some(PLL1_QCK);
-    config.rcc.pll2.p_ck = Some(PLL2_PCK);
-    config.rcc.pll2.q_ck = Some(PLL2_QCK);
-    config.rcc.pll2.r_ck = Some(PLL2_RCK);
-    config.rcc.hse = Some(HSE_CLK);
+    // config.rcc.pll2.p_ck = Some(PLL2_PCK);
+    // config.rcc.pll2.q_ck = Some(PLL2_QCK);
+    // config.rcc.pll2.r_ck = Some(PLL2_RCK);
+    // config.rcc.hse = Some(HSE_CLK);
 
     embassy_stm32::init(config)
 }
