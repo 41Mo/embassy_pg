@@ -15,7 +15,6 @@ use mavlink::common as mav_common;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
-use crate::usb::{usb_task, Console};
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
@@ -86,13 +85,13 @@ async fn sending_task() {
 fn main() -> ! {
     info!("Entry point");
 
-    let p = board::init_periph();
-    let console = Console::new(p);
 
     let executor = EXECUTOR.init(Executor::new());
 
+    let console = board::init();
+
     executor.run(|spawner| {
-        unwrap!(spawner.spawn(usb_task(console)));
+        unwrap!(spawner.spawn(usb::usb_task(console)));
         unwrap!(spawner.spawn(sending_task()));
     })
 }
