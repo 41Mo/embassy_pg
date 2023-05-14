@@ -3,17 +3,12 @@
 #![feature(type_alias_impl_trait)]
 
 mod usb;
+mod board;
 
 use cortex_m_rt::entry;
 use defmt::{debug, info, unwrap};
 use embassy_executor::Executor;
-use embassy_stm32::peripherals::USB_OTG_FS;
-use embassy_stm32::time::mhz;
-use embassy_stm32::usb_otg::Driver;
-use embassy_stm32::{self, interrupt, Config};
 use embassy_time::{Duration, Timer, Instant};
-use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
-use embassy_usb::Builder;
 use embassy_futures::join::join;
 use mavlink;
 use mavlink::common as mav_common;
@@ -24,6 +19,7 @@ use crate::usb::{usb_task, Console};
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
+#[macro_export]
 macro_rules! singleton {
     ($val:expr) => {{
         type T = impl Sized;
@@ -32,8 +28,6 @@ macro_rules! singleton {
         x
     }};
 }
-
-pub type UsbDriver = Driver<'static, USB_OTG_FS>;
 
 static MAV_HEADER: mavlink::MavHeader = mavlink::MavHeader {
     system_id: 1,
@@ -92,60 +86,10 @@ async fn sending_task() {
 fn main() -> ! {
     info!("Entry point");
 
-    let mut config = Config::default();
-    config.rcc.sys_ck = Some(mhz(400));
-    config.rcc.hclk = Some(mhz(200));
-    config.rcc.pll1.q_ck = Some(mhz(100));
-    let p = embassy_stm32::init(config);
-
-    // Create the driver, from the HAL.
-    let irq = interrupt::take!(OTG_FS);
-    let driver = Driver::new_fs(
-        p.USB_OTG_FS,
-        irq,
-        p.PA12,
-        p.PA11,
-        &mut singleton!([0u8; 256])[..],
-    );
-
-    // Create embassy-usb Config
-    let mut config = embassy_usb::Config::new(0xc0de, 0xcafe);
-    config.manufacturer = Some("Embassy");
-    config.product = Some("USB-serial example");
-    config.serial_number = Some("12345678");
-
-    // Required for windows compatiblity.
-    // https://developer.nordicsemi.com/nRF_Connect_SDK/doc/1.9.1/kconfig/CONFIG_CDC_ACM_IAD.html#help
-    config.device_class = 0xEF;
-    config.device_sub_class = 0x02;
-    config.device_protocol = 0x01;
-    config.composite_with_iads = true;
-
-    // Create embassy-usb DeviceBuilder using the driver and config.
-    // It needs some buffers for building the descriptors.
-    let mut builder = Builder::new(
-        driver,
-        config,
-        &mut singleton!([0; 256])[..],
-        &mut singleton!([0; 256])[..],
-        &mut singleton!([0; 256])[..],
-        &mut singleton!([0; 128])[..],
-    );
-
-    // Create classes on the builder.
-    let class = CdcAcmClass::new(&mut builder, singleton!(State::new()), 64);
-    let (tx, rx) = class.split();
-
-    // Build the builder.
-    let usb = builder.build();
+    let p = board::init_periph();
+    let console = Console::new(p);
 
     let executor = EXECUTOR.init(Executor::new());
-
-    let console = Console {
-        device: usb,
-        tx,
-        rx,
-    };
 
     executor.run(|spawner| {
         unwrap!(spawner.spawn(usb_task(console)));
