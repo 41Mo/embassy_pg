@@ -1,17 +1,17 @@
+use crate::usb;
 use embassy_stm32::peripherals::USB_OTG_FS;
 use embassy_stm32::time::{mhz, Hertz};
+use embassy_stm32::usb_otg::Driver;
 use embassy_stm32::{interrupt, Peripherals};
 use static_cell::StaticCell;
-use embassy_stm32::usb_otg::Driver;
-use crate::usb;
 
 const SYS_CK: Hertz = mhz(400);
 const HCLK: Hertz = mhz(200);
 const PLL1_QCK: Hertz = mhz(80);
-const PLL2_PCK: Hertz = mhz(180);
-const PLL2_QCK: Hertz = mhz(72);
-const PLL2_RCK: Hertz = mhz(360);
-const HSE_CLK: Hertz = mhz(24);
+// const PLL2_PCK: Hertz = mhz(180);
+// const PLL2_QCK: Hertz = mhz(72);
+// const PLL2_RCK: Hertz = mhz(360);
+// const HSE_CLK: Hertz = mhz(24);
 
 pub type UsbDriver = Driver<'static, USB_OTG_FS>;
 
@@ -39,7 +39,11 @@ fn init_periph() -> Peripherals {
     embassy_stm32::init(config)
 }
 
-pub fn init() -> usb::Console<'static, UsbDriver> {
+pub fn init() -> (
+    usb::USB,
+    usb::Reciever,
+    usb::Sender,
+) {
     let p = init_periph();
     usb::Console::new(p)
 }

@@ -20,7 +20,7 @@ set backtrace limit 32
 # *try* to stop at the user entry point (it might be gone due to inlining)
 #break main
 
-monitor arm semihosting enable
+#monitor arm semihosting enable
 
 # # send captured ITM to the file itm.fifo
 # # (the microcontroller SWO pin must be connected to the programmer SWO pin)

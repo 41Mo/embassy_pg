@@ -51,7 +51,7 @@ def main():
             print("HEARTBEAT_PACKET: ", data)
             print("SCALED_IMU: ", si_freq/nloops)
             print("SCALED_IMU_PACKET: ", si_packet)
-            nloops = 0
+            nloops = 1
             si_freq = 0
 
         if data.msgname == "SCALED_IMU":

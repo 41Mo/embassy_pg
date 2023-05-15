@@ -21,10 +21,11 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 futures = { version = "0.3.17", default-features = false, features = ["async-await"] }
 static_cell = "1.0"
 heapless = { version = "0.7.5", default-features = false }
-# embedded-hal = "0.2.6"
+embedded-hal = "0.2.6"
 # embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.10" }
-embedded-hal-async = { version = "0.2.0-alpha.1" }
+# embedded-hal-async = { version = "0.2.0-alpha.1" }
 mavlink = {version = "0.11.2", path = "../rust-mavlink", default-features = false, features = ["common", "embedded"]}
+nb = "1.1.0"
 # embedded-nal-async = "0.4.0"
 # rand_core = "0.6.3"
 # critical-section = "1.1"
@@ -49,7 +50,7 @@ debug = 2
 debug-assertions = false # <-
 incremental = false
 lto = 'fat'
-opt-level = 3 # <-
+opt-level = 2 # <-
 overflow-checks = false # <-
 
 [[bin]]
