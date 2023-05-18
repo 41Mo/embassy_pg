@@ -1,5 +1,8 @@
 [target.thumbv7em-none-eabihf]
 runner = 'probe-rs-cli run --chip STM32H743ZITx'
 
+[target.thumbv7em-none-eabi]
+runner = 'probe-rs-cli run --chip STM32F407VGTx'
+
 [build]
-target = "thumbv7em-none-eabihf" # Cortex-M4F and Cortex-M7F (with FPU)
+target = "thumbv7em-none-eabi"

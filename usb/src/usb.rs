@@ -1,4 +1,4 @@
-use crate::board;
+use board::hal as board;
 use crate::traits;
 use embassy_usb::class::cdc_acm;
 use embassy_usb::driver::EndpointError;
@@ -10,7 +10,7 @@ pub struct Console {}
 
 impl Console {
     pub fn new(
-        p: embassy_stm32::Peripherals,
+        p: board::Peripherals,
     ) -> (USB, Reciever, Sender) {
         let driver = board::usb_driver(p);
 

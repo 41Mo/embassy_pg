@@ -14,7 +14,7 @@ def wait_heartbeat(m:mavutil.mavudp):
         print("SYSID= ", msg._msgbuf[3], "\nCOMPID= ", msg._msgbuf[4] , "\nPAYLOAD= ", msg)
 
 def main():
-    connection:mavutil.mavudp
+    connection:mavutil.mavserial
 
     connection = mavutil.mavlink_connection(device=test_dev, baud=115200, source_system=255, source_component=254)
     print("Waiting for heartbeat")
@@ -39,9 +39,11 @@ def main():
             continue
         
         if data._type == "BAD_DATA":
+            print("baddata")
             continue
 
         if "UNKNOWN" in data._type:
+            print("unknowndata")
             continue
 
         if data.msgname == "HEARTBEAT":

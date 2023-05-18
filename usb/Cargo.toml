@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 embassy-executor = { version = "0.2.0", path="../embassy/embassy-executor", features = ["arch-cortex-m", "executor-thread", "defmt", "integrated-timers"]}
-embassy-stm32 = { version = "0.1.0", path="../embassy/embassy-stm32", features = ["nightly", "defmt", "stm32h743vi", "time-driver-any", "exti", "unstable-pac", "unstable-traits"]}
 embassy-sync = { version = "0.2.0", path="../embassy/embassy-sync", features = ["defmt"]}
 embassy-usb = { version = "0.1.0", path="../embassy/embassy-usb", features = ["defmt"]}
 embassy-time = { version = "0.1.0", path = "../embassy/embassy-time", features = ["defmt", "defmt-timestamp-uptime", "unstable-traits", "tick-hz-32_768"] }
@@ -21,11 +20,12 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 futures = { version = "0.3.17", default-features = false, features = ["async-await"] }
 static_cell = "1.0"
 heapless = { version = "0.7.5", default-features = false }
-embedded-hal = "0.2.6"
+mavlink = {version = "0.11.2", path = "../rust-mavlink", default-features = false, features = ["common", "embedded"]}
+board = { version="0.1.0", path = "board"}
+
+# embedded-hal = "0.2.6"
 # embedded-hal-1 = { package = "embedded-hal", version = "=1.0.0-alpha.10" }
 # embedded-hal-async = { version = "0.2.0-alpha.1" }
-mavlink = {version = "0.11.2", path = "../rust-mavlink", default-features = false, features = ["common", "embedded"]}
-nb = "1.1.0"
 # embedded-nal-async = "0.4.0"
 # rand_core = "0.6.3"
 # critical-section = "1.1"
@@ -33,6 +33,12 @@ nb = "1.1.0"
 # stm32-fmc = "0.2.4"
 # embedded-storage = "0.3.0"
 # ringbuf = { version = "0.3.3", default-features = false }
+
+[features]
+default = ["f407-disco"]
+f407-disco = ["board/f407-disco"]
+matekh743 = ["board/matekh743"]
+
 
 # cargo build/run
 [profile.dev]
@@ -58,5 +64,4 @@ name = "usb_test"
 path = "src/main.rs"
 test = false
 bench = false
-
 

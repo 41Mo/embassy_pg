@@ -1,9 +1,9 @@
-use crate::usb;
 use embassy_stm32::peripherals::USB_OTG_FS;
 use embassy_stm32::time::{mhz, Hertz};
 use embassy_stm32::usb_otg::Driver;
-use embassy_stm32::{interrupt, Peripherals};
-use static_cell::StaticCell;
+use embassy_stm32::{interrupt};
+pub use crate::Peripherals;
+use crate::singleton;
 
 const SYS_CK: Hertz = mhz(400);
 const HCLK: Hertz = mhz(200);
@@ -22,11 +22,11 @@ pub fn usb_driver(p: Peripherals) -> UsbDriver {
         irq,
         p.PA12,
         p.PA11,
-        &mut crate::singleton!([0u8; 256])[..],
+        &mut singleton!([0u8; 256])[..],
     )
 }
 
-fn init_periph() -> Peripherals {
+pub fn init_periph() -> Peripherals {
     let mut config = embassy_stm32::Config::default();
     config.rcc.sys_ck = Some(SYS_CK);
     config.rcc.hclk = Some(HCLK);
@@ -39,11 +39,3 @@ fn init_periph() -> Peripherals {
     embassy_stm32::init(config)
 }
 
-pub fn init() -> (
-    usb::USB,
-    usb::Reciever,
-    usb::Sender,
-) {
-    let p = init_periph();
-    usb::Console::new(p)
-}
